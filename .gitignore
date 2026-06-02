@@ -1,0 +1,23 @@
+# OS / editor noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local state — don't ship these into someone else's clone
+sample-vault/Daily/*.md
+sample-vault/Inbox/*.md
+!sample-vault/Inbox/.gitkeep
+sample-vault/Meetings/*.md
+sample-vault/Refs/*.md
+sample-vault/Refs/Ideas/*.md
+sample-vault/Refs/.triage.lock
+sample-vault/Clips/*
+!sample-vault/Clips/.gitkeep
+!sample-vault/Daily/.gitkeep
+!sample-vault/Meetings/.gitkeep
+!sample-vault/Refs/.gitkeep
+!sample-vault/Refs/Ideas/.gitkeep
+
+# Logs
+*.log
