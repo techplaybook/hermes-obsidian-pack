@@ -32,21 +32,12 @@ if [ ${#files[@]} -eq 0 ]; then
   exit 0
 fi
 
-# Lockfile to prevent overlapping runs
-LOCK="$VAULT/Refs/.triage.lock"
-if [ -f "$LOCK" ]; then
-  if [ "$(find "$LOCK" -mmin +60 2>/dev/null)" ]; then
-    rm -f "$LOCK"
-  else
-    echo "Triage already running (lock at $LOCK); skipping this tick." >&2
-    exit 0
-  fi
-fi
-touch "$LOCK"
-trap 'rm -f "$LOCK"' EXIT
+# NOTE: concurrency is handled INSIDE the obsidian-inbox-triage skill, which
+# touches/deletes <vault>/Refs/.triage.lock itself. The wrapper must NOT create
+# that lock or the skill sees it and exits immediately (deadlock).
 
 export INBOX_TRIAGE_MAX_NOTES="$MAX_NOTES"
 
-hermes chat -Q -q \
+hermes chat -Q \
   --skills "obsidian,obsidian-inbox-triage" \
-  "Triage the inbox at $INBOX (vault root: $VAULT). Follow the obsidian-inbox-triage skill exactly. Process at most $MAX_NOTES notes. Output only the one-line summary."
+  -q "Triage the inbox at $INBOX (vault root: $VAULT). Follow the obsidian-inbox-triage skill exactly. Process at most $MAX_NOTES notes. Output only the one-line summary."

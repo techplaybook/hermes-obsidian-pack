@@ -1,23 +1,28 @@
 #!/usr/bin/env bash
 # install.sh — one-shot installer for hermes-obsidian-pack
 #
-# Usage: ./install.sh [--dry-run]
+# Usage: ./install.sh [--dry-run] [--force] [--link]
 #
 # Does three things:
-#   1. Copies the two skills into $HERMES_SKILLS_DIR (default ~/.hermes/skills/)
+#   1. Installs the two skills into $HERMES_SKILLS_DIR (default ~/.hermes/skills/)
+#      Default: copies them. With --link: keeps the canonical SKILL.md in
+#      <vault>/Skills/ and symlinks it in, so you can edit skills in the
+#      Obsidian UI and Hermes picks up changes live.
 #   2. Copies the cron wrappers to ~/.hermes/scripts/ and chmods them
 #   3. Registers two hermes cron jobs (daily 06:00 + hourly)
 #
-# Safe to re-run — it skips existing skill dirs unless --force is passed.
+# Safe to re-run — skips existing skill dirs/symlinks unless --force is passed.
 
 set -euo pipefail
 
 DRY_RUN=0
 FORCE=0
+LINK=0
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
     --force)   FORCE=1 ;;
+    --link)    LINK=1 ;;
     -h|--help)
       sed -n '2,15p' "$0"
       exit 0
@@ -65,17 +70,44 @@ fi
 echo
 
 # Step 1: skills
-echo "==> Installing skills"
+# Two modes:
+#   default   — copy skills into $SKILLS_DIR (self-contained, local).
+#   --link    — keep canonical SKILL.md in <vault>/Skills/ and symlink it into
+#               $SKILLS_DIR so you can edit skills in the Obsidian UI and have
+#               Hermes pick up changes live. NOTE: mark <vault>/Skills/ as
+#               "always keep on this device" in OneDrive so the symlink target
+#               never dehydrates to online-only.
+echo "==> Installing skills$( [ "$LINK" -eq 1 ] && echo ' (symlink-to-vault mode)' )"
 for skill in obsidian-daily-note obsidian-inbox-triage; do
   src="$REPO_ROOT/skills/$skill"
   dst="$SKILLS_DIR/$skill"
-  if [ -d "$dst" ] && [ "$FORCE" -eq 0 ]; then
-    echo "    [skip] $skill already installed at $dst (use --force to overwrite)"
+
+  # Preserve an existing symlink setup unless --force is given.
+  if [ -L "$dst/SKILL.md" ] && [ "$FORCE" -eq 0 ]; then
+    echo "    [skip] $skill already symlinked (SKILL.md -> $(readlink "$dst/SKILL.md"))"
     continue
   fi
-  run mkdir -p "$SKILLS_DIR"
-  run cp -r "$src" "$dst"
-  echo "    [ok]  $skill -> $dst"
+
+  if [ "$LINK" -eq 1 ]; then
+    # Symlink mode: canonical file lives in the vault, SKILL.md links to it.
+    run mkdir -p "$SKILLS_DIR/$skill" "$VAULT_PATH/Skills"
+    if [ ! -f "$VAULT_PATH/Skills/$skill.md" ] || [ "$FORCE" -eq 1 ]; then
+      run cp "$src/SKILL.md" "$VAULT_PATH/Skills/$skill.md"
+    fi
+    run rm -f "$dst/SKILL.md"
+    run ln -s "$VAULT_PATH/Skills/$skill.md" "$dst/SKILL.md"
+    echo "    [ok]  $skill -> SKILL.md symlinked to vault/Skills/$skill.md"
+  else
+    # Copy mode (default).
+    if [ -d "$dst" ] && [ "$FORCE" -eq 0 ]; then
+      echo "    [skip] $skill already installed at $dst (use --force to overwrite)"
+      continue
+    fi
+    run mkdir -p "$SKILLS_DIR"
+    run rm -rf "$dst"
+    run cp -r "$src" "$dst"
+    echo "    [ok]  $skill -> $dst"
+  fi
 done
 echo
 
@@ -104,14 +136,16 @@ if [ -n "$existing" ]; then
   echo "$existing" | sed 's/^/      /'
   echo "    Skipping registration. Remove them first with 'hermes cron remove <id>' if you want to reinstall."
 else
+  # NOTE: --script must be RELATIVE to ~/.hermes/scripts/ (just the filename).
+  # Passing an absolute path is rejected by 'hermes cron create'.
   run hermes cron create '0 6 * * *' \
     --no-agent \
-    --script "$SCRIPTS_DIR/daily-note.sh" \
+    --script 'daily-note.sh' \
     --name 'obsidian-daily-note'
 
   run hermes cron create '0 * * * *' \
     --no-agent \
-    --script "$SCRIPTS_DIR/inbox-triage.sh" \
+    --script 'inbox-triage.sh' \
     --name 'obsidian-inbox-triage'
 fi
 rm -f /tmp/.hop_existing

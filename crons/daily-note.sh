@@ -35,6 +35,6 @@ if [ -f "$NOTE_PATH" ]; then
 fi
 
 # Use hermes chat -q (quiet, one-shot) with the relevant skills preloaded.
-hermes chat -Q -q \
+hermes chat -Q \
   --skills "obsidian,obsidian-daily-note" \
-  "Generate today's daily note ($TODAY) for the Obsidian vault at: $VAULT. Follow the obsidian-daily-note skill exactly. Output only the one-line success summary."
+  -q "Generate today's daily note ($TODAY) for the Obsidian vault at: $VAULT. Follow the obsidian-daily-note skill exactly. Output only the one-line success summary."

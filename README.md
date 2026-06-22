@@ -64,9 +64,27 @@ cd hermes-obsidian-pack
 ```
 
 `install.sh` does three things:
-1. Copies the two skills into `~/.hermes/skills/`.
+1. Installs the two skills into `~/.hermes/skills/`.
 2. Copies the two cron wrappers to `~/.hermes/scripts/` and `chmod +x` them.
 3. Registers the cron jobs via `hermes cron create`.
+
+#### Edit-in-Obsidian mode (`--link`)
+
+By default the skills are copied. If you'd rather edit the skills in the
+Obsidian UI and have Hermes pick up changes live, install with `--link`:
+
+```bash
+./install.sh --link
+```
+
+This keeps the canonical `SKILL.md` in `<vault>/Skills/<skill>.md` and symlinks
+it into `~/.hermes/skills/<skill>/SKILL.md`. Edit the note in Obsidian, save,
+and the next cron run uses the new version — no copy, no reinstall.
+
+> **OneDrive / cloud-sync users:** mark `<vault>/Skills/` as "always keep on
+> this device" so the symlink target never dehydrates to online-only (a
+> dehydrated target reads as empty and breaks the skill). Re-running the
+> installer preserves an existing symlink unless you pass `--force`.
 
 After install, verify:
 
@@ -90,14 +108,16 @@ cp crons/*.sh ~/.hermes/scripts/
 chmod +x ~/.hermes/scripts/*.sh
 
 # Schedule via Hermes cron (preferred)
+# NOTE: --script must be RELATIVE to ~/.hermes/scripts/ (just the filename).
+#       Quote the cron expression so the shell doesn't glob-expand the '*'.
 hermes cron create '0 6 * * *' \
   --no-agent \
-  --script ~/.hermes/scripts/daily-note.sh \
+  --script daily-note.sh \
   --name 'obsidian-daily-note'
 
 hermes cron create '0 * * * *' \
   --no-agent \
-  --script ~/.hermes/scripts/inbox-triage.sh \
+  --script inbox-triage.sh \
   --name 'obsidian-inbox-triage'
 ```
 
